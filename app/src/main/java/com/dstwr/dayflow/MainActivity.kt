@@ -150,7 +150,7 @@ private fun DayflowApp(context: Context) {
 }
 
 @Composable
-private fun HomeScreen(tasks: List<Entry>, notes: List<Entry>, reminders: List<Entry>, navigate: (Section) -> Unit) {
+private fun androidx.compose.foundation.layout.ColumnScope.HomeScreen(tasks: List<Entry>, notes: List<Entry>, reminders: List<Entry>, navigate: (Section) -> Unit) {
     val completed = tasks.count { it.done }
     LazyColumn(Modifier.fillMaxWidth().weight(1f), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item {
@@ -196,7 +196,7 @@ private fun HomeScreen(tasks: List<Entry>, notes: List<Entry>, reminders: List<E
 }
 
 @Composable
-private fun EntryScreen(title: String, subtitle: String, entries: MutableList<Entry>, empty: String, edit: (Entry) -> Unit) {
+private fun androidx.compose.foundation.layout.ColumnScope.EntryScreen(title: String, subtitle: String, entries: MutableList<Entry>, empty: String, edit: (Entry) -> Unit) {
     LazyColumn(Modifier.fillMaxWidth().weight(1f), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { Text(subtitle, color = Muted, fontSize = 13.sp) }
         if (entries.isEmpty()) item { EmptyState(empty) }
@@ -216,7 +216,7 @@ private fun EntryScreen(title: String, subtitle: String, entries: MutableList<En
 }
 
 @Composable
-private fun HabitInfo() {
+private fun androidx.compose.foundation.layout.ColumnScope.HabitInfo() {
     Column(Modifier.fillMaxWidth().weight(1f).padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         GlassCard {
             Text("العادات اليومية", color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Bold)
