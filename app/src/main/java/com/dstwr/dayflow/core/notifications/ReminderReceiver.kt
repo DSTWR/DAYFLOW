@@ -5,7 +5,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationCompat
-import com.dstwr.dayflow.R
 
 class ReminderReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -13,7 +12,7 @@ class ReminderReceiver : BroadcastReceiver() {
         val title = intent.getStringExtra(EXTRA_TITLE) ?: "لديك تذكير"
         val text = intent.getStringExtra(EXTRA_TEXT) ?: "حان الوقت لما خططت له."
         val notification = NotificationCompat.Builder(context, ReminderChannels.REMINDERS)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(android.R.drawable.ic_popup_reminder)
             .setContentTitle(title)
             .setContentText(text)
             .setAutoCancel(true)
