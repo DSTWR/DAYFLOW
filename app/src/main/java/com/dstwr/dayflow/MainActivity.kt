@@ -70,6 +70,7 @@ private fun DayflowApp(context: Context) {
     val tasks = remember { mutableStateListOf<Entry>().apply { addAll(store.read("tasks")) } }
     val notes = remember { mutableStateListOf<Entry>().apply { addAll(store.read("notes")) } }
     val reminders = remember { mutableStateListOf<Entry>().apply { addAll(store.read("reminders")) } }
+    val habits = remember { mutableStateListOf<Entry>().apply { addAll(store.read("habits")) } }
     var section by remember { mutableStateOf(Section.HOME) }
     var showEditor by remember { mutableStateOf(false) }
     var draftTitle by remember { mutableStateOf("") }
@@ -88,10 +89,10 @@ private fun DayflowApp(context: Context) {
                 }
                 when (section) {
                     Section.HOME -> HomeScreen(tasks, notes, reminders) { section = it }
-                    Section.TASKS -> EntryScreen("مهامك", "أنجز ما يهمك، خطوة بخطوة", tasks, "لا توجد مهام بعد") { selectedEntry = it; draftTitle = it.title; draftDetail = it.detail; showEditor = true }
-                    Section.NOTES -> EntryScreen("مساحة أفكارك", "دوّن أفكارك وارجع إليها متى شئت", notes, "دفتر ملاحظاتك فارغ") { selectedEntry = it; draftTitle = it.title; draftDetail = it.detail; showEditor = true }
-                    Section.REMINDERS -> EntryScreen("تذكيراتك", "احتفظ بالأمور المهمة أمام عينيك", reminders, "لا توجد تذكيرات بعد") { selectedEntry = it; draftTitle = it.title; draftDetail = it.detail; showEditor = true }
-                    Section.HABITS -> HabitInfo()
+                    Section.TASKS -> EntryScreen("مهامك", "أنجز ما يهمك، خطوة بخطوة", tasks, "لا توجد مهام بعد", onDelete = { store.write("tasks", tasks) }, onToggle = { entry -> val i = tasks.indexOfFirst { it.id == entry.id }; if (i >= 0) { tasks[i] = tasks[i].copy(done = !tasks[i].done); store.write("tasks", tasks) } }) { selectedEntry = it; draftTitle = it.title; draftDetail = it.detail; showEditor = true }
+                    Section.NOTES -> EntryScreen("مساحة أفكارك", "دوّن أفكارك وارجع إليها متى شئت", notes, "دفتر ملاحظاتك فارغ", onDelete = { store.write("notes", notes) }) { selectedEntry = it; draftTitle = it.title; draftDetail = it.detail; showEditor = true }
+                    Section.REMINDERS -> EntryScreen("تذكيراتك", "احتفظ بالأمور المهمة أمام عينيك", reminders, "لا توجد تذكيرات بعد", onDelete = { store.write("reminders", reminders) }) { selectedEntry = it; draftTitle = it.title; draftDetail = it.detail; showEditor = true }
+                    Section.HABITS -> HabitScreen(habits, onAdd = { title -> habits.add(0, Entry(System.currentTimeMillis(), title)); store.write("habits", habits) }, onToggle = { entry -> val i = habits.indexOfFirst { it.id == entry.id }; if (i >= 0) { habits[i] = habits[i].copy(done = !habits[i].done); store.write("habits", habits) } }, onDelete = { entry -> habits.remove(entry); store.write("habits", habits) })
                 }
                 Spacer(Modifier.weight(1f))
                 NavigationBar(containerColor = Color(0xF0120E20), contentColor = Muted) {
@@ -196,7 +197,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.HomeScreen(tasks: Lis
 }
 
 @Composable
-private fun androidx.compose.foundation.layout.ColumnScope.EntryScreen(title: String, subtitle: String, entries: MutableList<Entry>, empty: String, edit: (Entry) -> Unit) {
+private fun androidx.compose.foundation.layout.ColumnScope.EntryScreen(title: String, subtitle: String, entries: MutableList<Entry>, empty: String, onDelete: () -> Unit, onToggle: ((Entry) -> Unit)? = null, edit: (Entry) -> Unit) {
     LazyColumn(Modifier.fillMaxWidth().weight(1f), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { Text(subtitle, color = Muted, fontSize = 13.sp) }
         if (entries.isEmpty()) item { EmptyState(empty) }
@@ -207,8 +208,9 @@ private fun androidx.compose.foundation.layout.ColumnScope.EntryScreen(title: St
                         Text(entry.title, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
                         if (entry.detail.isNotBlank()) Text(entry.detail, color = Muted, fontSize = 12.sp)
                     }
+                    if (onToggle != null) Text(if (entry.done) "✓" else "○", color = if (entry.done) Gold else Violet, fontSize = 22.sp, modifier = Modifier.clickable { onToggle(entry) }.padding(8.dp))
                     Text("تحرير", color = Gold, fontSize = 12.sp, modifier = Modifier.clickable { edit(entry) }.padding(8.dp))
-                    Text("×", color = Color(0xFFFF8F9B), fontSize = 20.sp, modifier = Modifier.clickable { entries.remove(entry) }.padding(8.dp))
+                    Text("×", color = Color(0xFFFF8F9B), fontSize = 20.sp, modifier = Modifier.clickable { entries.remove(entry); onDelete() }.padding(8.dp))
                 }
             }
         }
@@ -216,15 +218,30 @@ private fun androidx.compose.foundation.layout.ColumnScope.EntryScreen(title: St
 }
 
 @Composable
-private fun androidx.compose.foundation.layout.ColumnScope.HabitInfo() {
-    Column(Modifier.fillMaxWidth().weight(1f).padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+private fun androidx.compose.foundation.layout.ColumnScope.HabitScreen(
+    habits: List<Entry>, onAdd: (String) -> Unit, onToggle: (Entry) -> Unit, onDelete: (Entry) -> Unit
+) {
+    var draft by remember { mutableStateOf("") }
+    Column(Modifier.fillMaxWidth().weight(1f).padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         GlassCard {
-            Text("العادات اليومية", color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Bold)
-            Text("ابدأ بعادة صغيرة وكررها باستمرار. مساحة تتبع العادات ستُربط بسجل يومي وتذكيرات مستقلة ضمن استكمال وحدات التطبيق.", color = Muted, fontSize = 13.sp, lineHeight = 21.sp)
+            Text("عاداتك تصنع يومك", color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+            Text("تابع التزامك اليومي وسجّل إنجازاتك.", color = Muted, fontSize = 13.sp)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                EditorField(draft, { draft = it }, "عادة جديدة")
+                TextButton(onClick = { if (draft.isNotBlank()) { onAdd(draft.trim()); draft = "" } }) { Text("إضافة", color = Gold) }
+            }
         }
-        GlassCard {
-            Text("قاعدة بسيطة", color = Gold, fontWeight = FontWeight.SemiBold)
-            Text("الاستمرارية أهم من الكمال.", color = Color.White)
+        if (habits.isEmpty()) EmptyState("أضف أول عادة تريد الالتزام بها")
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            items(habits, key = { it.id }) { habit ->
+                GlassCard {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(if (habit.done) "✓" else "○", color = if (habit.done) Gold else Violet, fontSize = 22.sp, modifier = Modifier.clickable { onToggle(habit) })
+                        Text(habit.title, color = Color.White, modifier = Modifier.weight(1f).padding(start = 12.dp))
+                        Text("حذف", color = Color(0xFFFF8F9B), modifier = Modifier.clickable { onDelete(habit) }.padding(6.dp))
+                    }
+                }
+            }
         }
     }
 }
