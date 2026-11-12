@@ -4,6 +4,7 @@
     <application
         android:allowBackup="true"
         android:label="DAYFLOW"
+        android:icon="@drawable/ic_dayflow_mark"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity
