@@ -165,6 +165,16 @@ private fun DayflowApp(context: Context) {
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     EditorField(draftTitle, { draftTitle = it }, "العنوان")
+                    if (section == Section.TASKS) {
+                        TextButton(onClick = {
+                            val calendar = Calendar.getInstance()
+                            DatePickerDialog(context, { _, year, month, day ->
+                                val hasDatePrefix = draftDetail.length >= 10 && draftDetail[4] == '-' && draftDetail[7] == '-'
+                                val message = if (hasDatePrefix) draftDetail.drop(10).trim() else draftDetail.trim()
+                                draftDetail = String.format(Locale.US, "%04d-%02d-%02d", year, month + 1, day) + if (message.isBlank()) "" else " $message"
+                            }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)).show()
+                        }) { Text(if (draftDetail.length >= 10 && draftDetail[4] == '-' && draftDetail[7] == '-') "التاريخ: ${draftDetail.take(10)}" else "تحديد تاريخ المهمة", color = Gold) }
+                    }
                     if (section == Section.REMINDERS) {
                         TextButton(onClick = {
                             val calendar = Calendar.getInstance()
