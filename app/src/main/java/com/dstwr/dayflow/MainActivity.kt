@@ -120,7 +120,7 @@ private fun DayflowApp(context: Context) {
                     Text("DSTWR", color = Muted, fontSize = 11.sp)
                 }
                 when (section) {
-                    Section.HOME -> HomeScreen(tasks, notes, reminders) { section = it }
+                    Section.HOME -> HomeScreen(tasks, notes, reminders, goals) { section = it }
                     Section.CALENDAR -> CalendarScreen(tasks, context)
                     Section.FOCUS -> FocusScreen()
                     Section.GOALS -> EntryScreen("أهدافك الكبيرة", "حوّل طموحاتك إلى خطوات واضحة", goals, "أضف هدفك الأول", onDelete = { entry -> goals.remove(entry); store.write("goals", goals) }, onToggle = { entry -> val i = goals.indexOfFirst { it.id == entry.id }; if (i >= 0) { goals[i] = goals[i].copy(done = !goals[i].done); store.write("goals", goals) } }) { selectedEntry = it; draftTitle = it.title; draftDetail = it.detail; draftPriority = it.priority; showEditor = true }
@@ -206,7 +206,7 @@ private fun DayflowApp(context: Context) {
 }
 
 @Composable
-private fun androidx.compose.foundation.layout.ColumnScope.HomeScreen(tasks: List<Entry>, notes: List<Entry>, reminders: List<Entry>, navigate: (Section) -> Unit) {
+private fun androidx.compose.foundation.layout.ColumnScope.HomeScreen(tasks: List<Entry>, notes: List<Entry>, reminders: List<Entry>, goals: List<Entry>, navigate: (Section) -> Unit) {
     val completed = tasks.count { it.done }
     LazyColumn(Modifier.fillMaxWidth().weight(1f), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item {
@@ -234,6 +234,12 @@ private fun androidx.compose.foundation.layout.ColumnScope.HomeScreen(tasks: Lis
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 SummaryCard("التذكيرات", reminders.size.toString(), "لا تنس المهم", Modifier.weight(1f)) { navigate(Section.REMINDERS) }
                 SummaryCard("العادات", "∞", "ابنِ روتينك", Modifier.weight(1f)) { navigate(Section.HABITS) }
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                SummaryCard("الأهداف", goals.size.toString(), "خطط للمستقبل", Modifier.weight(1f)) { navigate(Section.GOALS) }
+                SummaryCard("التركيز", "25 د", "ابدأ جلسة", Modifier.weight(1f)) { navigate(Section.FOCUS) }
             }
         }
         item { SectionHeader("أقرب مهامك", "قائمة سريعة") }
