@@ -7,12 +7,15 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -38,8 +41,9 @@ class MainActivity : ComponentActivity() {
 }
 
 private enum class Section(val title: String, val symbol: String) {
-    HOME("الرئيسية", "⌂"), TASKS("المهام", "✓"), NOTES("الملاحظات", "▤"),
-    REMINDERS("التذكيرات", "◷"), HABITS("العادات", "◇")
+    HOME("الرئيسية", "⌂"), TASKS("المهام", "✓"), CALENDAR("التقويم", "▦"), NOTES("الملاحظات", "▤"),
+    FOCUS("التركيز", "◷"), GOALS("الأهداف", "◎"), HABITS("العادات", "◇"), REMINDERS("التذكيرات", "♧"),
+    STATS("إحصائيات", "▥"), SETTINGS("الإعدادات", "⚙")
 }
 
 private data class Entry(val id: Long, val title: String, val detail: String = "", val done: Boolean = false)
@@ -71,6 +75,7 @@ private fun DayflowApp(context: Context) {
     val notes = remember { mutableStateListOf<Entry>().apply { addAll(store.read("notes")) } }
     val reminders = remember { mutableStateListOf<Entry>().apply { addAll(store.read("reminders")) } }
     val habits = remember { mutableStateListOf<Entry>().apply { addAll(store.read("habits")) } }
+    val goals = remember { mutableStateListOf<Entry>().apply { addAll(store.read("goals")) } }
     var section by remember { mutableStateOf(Section.HOME) }
     var showEditor by remember { mutableStateOf(false) }
     var draftTitle by remember { mutableStateOf("") }
@@ -89,25 +94,27 @@ private fun DayflowApp(context: Context) {
                 }
                 when (section) {
                     Section.HOME -> HomeScreen(tasks, notes, reminders) { section = it }
+                    Section.CALENDAR -> CalendarScreen(tasks)
+                    Section.FOCUS -> FocusScreen()
+                    Section.GOALS -> EntryScreen("أهدافك الكبيرة", "حوّل طموحاتك إلى خطوات واضحة", goals, "أضف هدفك الأول", onDelete = { store.write("goals", goals) }) { selectedEntry = it; draftTitle = it.title; draftDetail = it.detail; showEditor = true }
+                    Section.STATS -> StatsScreen(tasks, habits, notes, reminders, goals)
+                    Section.SETTINGS -> SettingsScreen(context)
                     Section.TASKS -> EntryScreen("مهامك", "أنجز ما يهمك، خطوة بخطوة", tasks, "لا توجد مهام بعد", onDelete = { store.write("tasks", tasks) }, onToggle = { entry -> val i = tasks.indexOfFirst { it.id == entry.id }; if (i >= 0) { tasks[i] = tasks[i].copy(done = !tasks[i].done); store.write("tasks", tasks) } }) { selectedEntry = it; draftTitle = it.title; draftDetail = it.detail; showEditor = true }
                     Section.NOTES -> EntryScreen("مساحة أفكارك", "دوّن أفكارك وارجع إليها متى شئت", notes, "دفتر ملاحظاتك فارغ", onDelete = { store.write("notes", notes) }) { selectedEntry = it; draftTitle = it.title; draftDetail = it.detail; showEditor = true }
                     Section.REMINDERS -> EntryScreen("تذكيراتك", "احتفظ بالأمور المهمة أمام عينيك", reminders, "لا توجد تذكيرات بعد", onDelete = { store.write("reminders", reminders) }) { selectedEntry = it; draftTitle = it.title; draftDetail = it.detail; showEditor = true }
                     Section.HABITS -> HabitScreen(habits, onAdd = { title -> habits.add(0, Entry(System.currentTimeMillis(), title)); store.write("habits", habits) }, onToggle = { entry -> val i = habits.indexOfFirst { it.id == entry.id }; if (i >= 0) { habits[i] = habits[i].copy(done = !habits[i].done); store.write("habits", habits) } }, onDelete = { entry -> habits.remove(entry); store.write("habits", habits) })
                 }
                 Spacer(Modifier.weight(1f))
-                NavigationBar(containerColor = Color(0xF0120E20), contentColor = Muted) {
+                Row(Modifier.fillMaxWidth().background(Color(0xF0120E20)).horizontalScroll(rememberScrollState()).padding(horizontal = 6.dp, vertical = 5.dp), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                     Section.values().forEach { item ->
-                        NavigationBarItem(
-                            selected = section == item,
-                            onClick = { section = item },
-                            icon = { Text(item.symbol, fontSize = 19.sp) },
-                            label = { Text(item.title, fontSize = 9.sp) },
-                            colors = NavigationBarItemDefaults.colors(selectedIconColor = Gold, selectedTextColor = Gold, indicatorColor = Color(0x553D2B62), unselectedIconColor = Muted, unselectedTextColor = Muted)
-                        )
+                        Column(Modifier.width(66.dp).clickable { section = item }.background(if (section == item) Color(0x553D2B62) else Color.Transparent, RoundedCornerShape(14.dp)).padding(vertical = 7.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(item.symbol, color = if (section == item) Gold else Muted, fontSize = 19.sp)
+                            Text(item.title, color = if (section == item) Gold else Muted, fontSize = 9.sp, maxLines = 1)
+                        }
                     }
                 }
             }
-            if (section == Section.TASKS || section == Section.NOTES || section == Section.REMINDERS) {
+            if (section == Section.TASKS || section == Section.NOTES || section == Section.REMINDERS || section == Section.GOALS) {
                 FloatingActionButton(
                     onClick = { selectedEntry = null; draftTitle = ""; draftDetail = ""; showEditor = true },
                     modifier = Modifier.align(Alignment.BottomEnd).padding(bottom = 88.dp, end = 22.dp),
@@ -133,13 +140,13 @@ private fun DayflowApp(context: Context) {
                 TextButton(onClick = {
                     val title = draftTitle.trim()
                     if (title.isNotEmpty()) {
-                        val list = when (section) { Section.TASKS -> tasks; Section.NOTES -> notes; else -> reminders }
+                        val list = when (section) { Section.TASKS -> tasks; Section.NOTES -> notes; Section.GOALS -> goals; else -> reminders }
                         if (selectedEntry == null) list.add(0, Entry(System.currentTimeMillis(), title, draftDetail.trim()))
                         else {
                             val index = list.indexOfFirst { it.id == selectedEntry!!.id }
                             if (index >= 0) list[index] = selectedEntry!!.copy(title = title, detail = draftDetail.trim())
                         }
-                        val key = when (section) { Section.TASKS -> "tasks"; Section.NOTES -> "notes"; else -> "reminders" }
+                        val key = when (section) { Section.TASKS -> "tasks"; Section.NOTES -> "notes"; Section.GOALS -> "goals"; else -> "reminders" }
                         store.write(key, list)
                     }
                     showEditor = false
@@ -283,5 +290,89 @@ private fun EmptyState(message: String) {
 private fun GlassCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     Surface(modifier = modifier.fillMaxWidth(), color = Panel, shape = RoundedCornerShape(22.dp), tonalElevation = 3.dp) {
         Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(6.dp), content = content)
+    }
+}
+
+@Composable
+private fun androidx.compose.foundation.layout.ColumnScope.CalendarScreen(tasks: List<Entry>) {
+    val today = remember { java.time.LocalDate.now() }
+    var selected by remember { mutableStateOf(today) }
+    val first = today.withDayOfMonth(1)
+    val days = first.lengthOfMonth()
+    Column(Modifier.fillMaxWidth().weight(1f).padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        GlassCard {
+            Text(today.month.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale("ar")), color = Gold, fontSize = 21.sp, fontWeight = FontWeight.Bold)
+            Text(today.year.toString(), color = Muted)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                listOf("س", "ح", "ن", "ث", "ر", "خ", "ج").forEach { Text(it, color = Muted, modifier = Modifier.weight(1f), textAlign = TextAlign.Center) }
+            }
+            val offset = first.dayOfWeek.value % 7
+            for (week in 0..((offset + days - 1) / 7)) {
+                Row(Modifier.fillMaxWidth()) {
+                    for (day in 0..6) {
+                        val number = week * 7 + day - offset + 1
+                        Box(Modifier.weight(1f).padding(2.dp).aspectRatio(1f).background(if (number in 1..days && selected.dayOfMonth == number) Color(0xFF624B91) else Color.Transparent, RoundedCornerShape(12.dp)).clickable { if (number in 1..days) selected = first.withDayOfMonth(number) }, contentAlignment = Alignment.Center) {
+                            if (number in 1..days) Text(number.toString(), color = if (selected.dayOfMonth == number) Color.White else Muted, fontSize = 13.sp)
+                        }
+                    }
+                }
+            }
+        }
+        Text("مهام ${selected.dayOfMonth} ${selected.month.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale("ar"))}", color = Color.White, fontWeight = FontWeight.Bold)
+        val dayTasks = tasks.filter { it.detail.contains(selected.toString()) }
+        if (dayTasks.isEmpty()) EmptyState("لا توجد مهام مرتبطة بهذا اليوم. أضف التاريخ في تفاصيل المهمة.")
+        else dayTasks.forEach { GlassCard { Text(it.title, color = Color.White) } }
+    }
+}
+
+@Composable
+private fun androidx.compose.foundation.layout.ColumnScope.FocusScreen() {
+    var seconds by remember { mutableIntStateOf(25 * 60) }
+    var running by remember { mutableStateOf(false) }
+    var duration by remember { mutableIntStateOf(25) }
+    LaunchedEffect(running, seconds) {
+        if (running && seconds > 0) { delay(1000); seconds -= 1 }
+        if (seconds == 0) running = false
+    }
+    Column(Modifier.fillMaxWidth().weight(1f).padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+        GlassCard {
+            Text("مساحة التركيز", color = Gold, fontSize = 21.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+            Text("ابتعد عن المشتتات وامنح مهمتك وقتها", color = Muted, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+            Spacer(Modifier.height(24.dp))
+            Text(String.format("%02d:%02d", seconds / 60, seconds % 60), color = Color.White, fontSize = 54.sp, fontWeight = FontWeight.Light, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+            LinearProgressIndicator(progress = { 1f - seconds.toFloat() / (duration * 60f) }, modifier = Modifier.fillMaxWidth().height(6.dp), color = Violet)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                TextButton(onClick = { running = !running }) { Text(if (running) "إيقاف مؤقت" else "ابدأ التركيز", color = Gold) }
+                TextButton(onClick = { running = false; seconds = duration * 60 }) { Text("إعادة", color = Muted) }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                listOf(15, 25, 45, 60).forEach { m -> TextButton(onClick = { running = false; duration = m; seconds = m * 60 }) { Text("$m د", color = if (duration == m) Gold else Muted) } }
+            }
+        }
+    }
+}
+
+@Composable
+private fun androidx.compose.foundation.layout.ColumnScope.StatsScreen(tasks: List<Entry>, habits: List<Entry>, notes: List<Entry>, reminders: List<Entry>, goals: List<Entry>) {
+    val done = tasks.count { it.done }
+    LazyColumn(Modifier.fillMaxWidth().weight(1f), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        item { Text("نظرة على تقدمك", color = Muted) }
+        item { GlassCard { Text("إنجاز المهام", color = Muted); Text("$done من ${tasks.size}", color = Gold, fontSize = 30.sp, fontWeight = FontWeight.Bold); LinearProgressIndicator(progress = { if (tasks.isEmpty()) 0f else done.toFloat() / tasks.size }, modifier = Modifier.fillMaxWidth(), color = Violet) } }
+        item { Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { SummaryCard("العادات", habits.size.toString(), "عادات مسجلة", Modifier.weight(1f)) {}; SummaryCard("الأهداف", goals.size.toString(), "أهدافك", Modifier.weight(1f)) {} } }
+        item { Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { SummaryCard("الملاحظات", notes.size.toString(), "ملاحظات", Modifier.weight(1f)) {}; SummaryCard("التذكيرات", reminders.size.toString(), "تذكيرات", Modifier.weight(1f)) {} } }
+        item { EmptyState("تُحسب الإحصائيات من بياناتك المحفوظة على هذا الجهاز.") }
+    }
+}
+
+@Composable
+private fun androidx.compose.foundation.layout.ColumnScope.SettingsScreen(context: Context) {
+    val prefs = remember { context.getSharedPreferences("dayflow_settings", Context.MODE_PRIVATE) }
+    var haptics by remember { mutableStateOf(prefs.getBoolean("haptics", true)) }
+    var weekStart by remember { mutableStateOf(prefs.getBoolean("week_saturday", true)) }
+    LazyColumn(Modifier.fillMaxWidth().weight(1f), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        item { GlassCard { Text("DAYFLOW", color = Gold, fontSize = 22.sp, fontWeight = FontWeight.Bold); Text("إصدار 1.0.0", color = Muted); Text("صُنع بعناية بواسطة DSTWR", color = Muted, fontSize = 12.sp) } }
+        item { GlassCard { Row(verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text("الاهتزاز", color = Color.White); Text("استجابة لمسية عند التفاعل", color = Muted, fontSize = 11.sp) }; Switch(haptics, { haptics = it; prefs.edit().putBoolean("haptics", it).apply() }) } } }
+        item { GlassCard { Row(verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text("بداية الأسبوع", color = Color.White); Text("السبت بدلاً من الأحد", color = Muted, fontSize = 11.sp) }; Switch(weekStart, { weekStart = it; prefs.edit().putBoolean("week_saturday", it).apply() }) } } }
+        item { EmptyState("بياناتك محفوظة محلياً على جهازك. لا يحتاج التطبيق إلى حساب أو خادم.") }
     }
 }
