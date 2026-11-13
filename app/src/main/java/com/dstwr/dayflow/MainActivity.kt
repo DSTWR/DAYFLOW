@@ -11,7 +11,11 @@ import com.dstwr.dayflow.core.notifications.ReminderScheduler
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.horizontalScroll
@@ -101,6 +105,7 @@ private fun DayflowApp(context: Context) {
                         Text("DAYFLOW", color = Gold, fontSize = 12.sp, letterSpacing = 4.sp, fontWeight = FontWeight.Bold)
                         Text(section.title, color = Color.White, fontSize = 25.sp, fontWeight = FontWeight.Bold)
                     }
+                    Image(painterResource(R.drawable.ic_dayflow_mark), contentDescription = "DAYFLOW", modifier = Modifier.size(48.dp))
                     Text("DSTWR", color = Muted, fontSize = 11.sp)
                 }
                 when (section) {
@@ -178,6 +183,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.HomeScreen(tasks: Lis
     LazyColumn(Modifier.fillMaxWidth().weight(1f), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item {
             Text("مساحة هادئة ليوم أكثر إنجازاً", color = Muted, fontSize = 14.sp)
+            HeroLandscape()
             Spacer(Modifier.height(8.dp))
             GlassCard {
                 Text("إنجاز المهام", color = Muted, fontSize = 13.sp)
@@ -408,5 +414,37 @@ private fun scheduleReminder(context: Context, id: Long, title: String, details:
     } catch (_: Exception) { return }
     if (trigger > System.currentTimeMillis()) {
         ReminderScheduler.schedule(context, id.toInt(), title, details.drop(16).trim().ifBlank { "حان موعد تذكيرك" }, trigger)
+    }
+}
+
+@Composable
+private fun HeroLandscape() {
+    Box(Modifier.fillMaxWidth().height(176.dp).clip(RoundedCornerShape(24.dp))) {
+        Canvas(Modifier.fillMaxSize()) {
+            val w = size.width
+            val h = size.height
+            drawRect(Brush.linearGradient(listOf(Color(0xFF4C3474), Color(0xFF171329), Color(0xFF0D0B18)), Offset.Zero, Offset(w, h)))
+            drawCircle(Color(0x66E7C78A), radius = 25.dp.toPx(), center = Offset(w * 0.78f, h * 0.28f))
+            val far = Path().apply {
+                moveTo(0f, h * 0.78f); lineTo(w * 0.20f, h * 0.42f); lineTo(w * 0.36f, h * 0.68f)
+                lineTo(w * 0.53f, h * 0.34f); lineTo(w * 0.76f, h * 0.73f); lineTo(w, h * 0.46f)
+                lineTo(w, h); lineTo(0f, h); close()
+            }
+            drawPath(far, Brush.linearGradient(listOf(Color(0xFF75609A), Color(0xFF29213F)), Offset.Zero, Offset(0f, h)))
+            val near = Path().apply {
+                moveTo(0f, h * 0.78f); lineTo(w * 0.27f, h * 0.62f); lineTo(w * 0.48f, h * 0.39f)
+                lineTo(w * 0.70f, h * 0.78f); lineTo(w, h * 0.58f); lineTo(w, h); lineTo(0f, h); close()
+            }
+            drawPath(near, Brush.linearGradient(listOf(Color(0xFF33264E), Color(0xFF100D1D)), Offset(0f, h * 0.35f), Offset(0f, h)))
+            val summit = Offset(w * 0.48f, h * 0.39f)
+            drawCircle(Gold, radius = 3.5.dp.toPx(), center = Offset(summit.x, summit.y - 13.dp.toPx()))
+            drawLine(Gold, Offset(summit.x, summit.y - 8.dp.toPx()), Offset(summit.x, summit.y + 2.dp.toPx()), strokeWidth = 2.dp.toPx())
+            drawLine(Gold, Offset(summit.x, summit.y - 4.dp.toPx()), Offset(summit.x - 5.dp.toPx(), summit.y + 1.dp.toPx()), strokeWidth = 1.5.dp.toPx())
+            drawLine(Gold, Offset(summit.x, summit.y - 4.dp.toPx()), Offset(summit.x + 5.dp.toPx(), summit.y + 1.dp.toPx()), strokeWidth = 1.5.dp.toPx())
+        }
+        Column(Modifier.align(Alignment.BottomStart).padding(16.dp)) {
+            Text("خطوة صغيرة، يوم مختلف", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Text("رتّب أولوياتك وابدأ من هنا", color = Color(0xFFE4D9F3), fontSize = 11.sp)
+        }
     }
 }
