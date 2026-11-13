@@ -121,7 +121,7 @@ private fun DayflowApp(context: Context) {
                     Section.HOME -> HomeScreen(tasks, notes, reminders) { section = it }
                     Section.CALENDAR -> CalendarScreen(tasks, context)
                     Section.FOCUS -> FocusScreen()
-                    Section.GOALS -> EntryScreen("أهدافك الكبيرة", "حوّل طموحاتك إلى خطوات واضحة", goals, "أضف هدفك الأول", onDelete = { entry -> goals.remove(entry); store.write("goals", goals) }) { selectedEntry = it; draftTitle = it.title; draftDetail = it.detail; draftPriority = it.priority; showEditor = true }
+                    Section.GOALS -> EntryScreen("أهدافك الكبيرة", "حوّل طموحاتك إلى خطوات واضحة", goals, "أضف هدفك الأول", onDelete = { entry -> goals.remove(entry); store.write("goals", goals) }, onToggle = { entry -> val i = goals.indexOfFirst { it.id == entry.id }; if (i >= 0) { goals[i] = goals[i].copy(done = !goals[i].done); store.write("goals", goals) } }) { selectedEntry = it; draftTitle = it.title; draftDetail = it.detail; draftPriority = it.priority; showEditor = true }
                     Section.STATS -> StatsScreen(tasks, habits, notes, reminders, goals)
                     Section.SETTINGS -> SettingsScreen(context)
                     Section.TASKS -> EntryScreen("مهامك", "أنجز ما يهمك، خطوة بخطوة", tasks, "لا توجد مهام بعد", onDelete = { entry -> tasks.remove(entry); store.write("tasks", tasks) }, onToggle = { entry -> val i = tasks.indexOfFirst { it.id == entry.id }; if (i >= 0) { tasks[i] = tasks[i].copy(done = !tasks[i].done); store.write("tasks", tasks) } }) { selectedEntry = it; draftTitle = it.title; draftDetail = it.detail; showEditor = true }
@@ -258,7 +258,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.EntryScreen(title: St
             GlassCard {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f).clickable { edit(entry) }) {
-                        Text(entry.title, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                        Text(entry.title, color = if (entry.done) Muted else Color.White, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
                         if (entry.priority > 1) Text(if (entry.priority == 3) "أولوية عاجلة" else "أولوية مهمة", color = if (entry.priority == 3) Color(0xFFFF9A9A) else Gold, fontSize = 10.sp)
                         if (entry.detail.isNotBlank()) Text(entry.detail, color = Muted, fontSize = 12.sp)
                     }
