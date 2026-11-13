@@ -1,6 +1,8 @@
 package com.dstwr.dayflow
 
 import android.content.Context
+import android.app.DatePickerDialog
+import android.app.TimePickerDialog
 import android.content.Intent
 import android.provider.Settings
 import android.Manifest
@@ -44,6 +46,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.Calendar
+import java.util.Locale
 
 private val Night = Color(0xFF090713)
 private val Panel = Color(0xCC211A35)
@@ -161,7 +165,18 @@ private fun DayflowApp(context: Context) {
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     EditorField(draftTitle, { draftTitle = it }, "العنوان")
-                    EditorField(draftDetail, { draftDetail = it }, when (section) { Section.REMINDERS -> "موعد: YYYY-MM-DD HH:mm ثم وصف التذكير"; Section.TASKS -> "تاريخ اختياري: YYYY-MM-DD ثم تفاصيل المهمة"; else -> "التفاصيل (اختياري)" })
+                    if (section == Section.REMINDERS) {
+                        TextButton(onClick = {
+                            val calendar = Calendar.getInstance()
+                            DatePickerDialog(context, { _, year, month, day ->
+                                TimePickerDialog(context, { _, hour, minute ->
+                                    val message = draftDetail.drop(16).trim()
+                                    draftDetail = String.format(Locale.US, "%04d-%02d-%02d %02d:%02d", year, month + 1, day, hour, minute) + if (message.isBlank()) "" else " $message"
+                                }, calendar.get(Calendar.HOUR_OF_DAY), calendar.get(Calendar.MINUTE), true).show()
+                            }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)).show()
+                        }) { Text(if (draftDetail.length >= 16) "الموعد: ${draftDetail.take(16)}" else "اختيار التاريخ والوقت", color = Gold) }
+                    }
+                    EditorField(draftDetail, { draftDetail = it }, when (section) { Section.REMINDERS -> "بعد الموعد أضف وصف التذكير"; Section.TASKS -> "تاريخ اختياري: YYYY-MM-DD ثم تفاصيل المهمة"; else -> "التفاصيل (اختياري)" })
                     if (section == Section.TASKS) {
                         Text("أولوية المهمة", color = Muted, fontSize = 12.sp)
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
