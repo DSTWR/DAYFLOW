@@ -131,7 +131,6 @@ private fun DayflowApp(context: Context) {
                     Section.REMINDERS -> EntryScreen("تذكيراتك", "احتفظ بالأمور المهمة أمام عينيك", reminders, "لا توجد تذكيرات بعد", onDelete = { entry -> ReminderScheduler.cancel(context, entry.id.toInt()); reminders.remove(entry); store.write("reminders", reminders) }) { selectedEntry = it; draftTitle = it.title; draftDetail = it.detail; showEditor = true }
                     Section.HABITS -> HabitScreen(habits, onAdd = { title -> habits.add(0, Entry(System.currentTimeMillis(), title)); store.write("habits", habits) }, onToggle = { entry -> val i = habits.indexOfFirst { it.id == entry.id }; if (i >= 0) { habits[i] = if (habits[i].done) habits[i].copy(done = false, detail = "") else habits[i].copy(done = true, detail = java.time.LocalDate.now().toString()); store.write("habits", habits) } }, onDelete = { entry -> habits.remove(entry); store.write("habits", habits) })
                 }
-                Spacer(Modifier.weight(1f))
                 Row(Modifier.fillMaxWidth().background(Color(0xF0120E20)).horizontalScroll(rememberScrollState()).padding(horizontal = 6.dp, vertical = 5.dp), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                     Section.values().forEach { item ->
                         Column(Modifier.width(66.dp).clickable { section = item }.background(if (section == item) Color(0x553D2B62) else Color.Transparent, RoundedCornerShape(14.dp)).padding(vertical = 7.dp), horizontalAlignment = Alignment.CenterHorizontally) {
