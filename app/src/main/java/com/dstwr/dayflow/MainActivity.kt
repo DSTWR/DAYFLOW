@@ -1,6 +1,8 @@
 package com.dstwr.dayflow
 
 import android.content.Context
+import android.content.Intent
+import android.provider.Settings
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
@@ -419,12 +421,15 @@ private fun androidx.compose.foundation.layout.ColumnScope.StatsScreen(tasks: Li
 @Composable
 private fun androidx.compose.foundation.layout.ColumnScope.SettingsScreen(context: Context) {
     val prefs = remember { context.getSharedPreferences("dayflow_settings", Context.MODE_PRIVATE) }
-    var haptics by remember { mutableStateOf(prefs.getBoolean("haptics", true)) }
     var weekStart by remember { mutableStateOf(prefs.getBoolean("week_saturday", true)) }
     LazyColumn(Modifier.fillMaxWidth().weight(1f), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { GlassCard { Text("DAYFLOW", color = Gold, fontSize = 22.sp, fontWeight = FontWeight.Bold); Text("إصدار 1.0.0", color = Muted); Text("صُنع بعناية بواسطة DSTWR", color = Muted, fontSize = 12.sp) } }
-        item { GlassCard { Row(verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text("الاهتزاز", color = Color.White); Text("استجابة لمسية عند التفاعل", color = Muted, fontSize = 11.sp) }; Switch(haptics, { haptics = it; prefs.edit().putBoolean("haptics", it).apply() }) } } }
         item { GlassCard { Row(verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text("بداية الأسبوع", color = Color.White); Text("السبت بدلاً من الأحد", color = Muted, fontSize = 11.sp) }; Switch(weekStart, { weekStart = it; prefs.edit().putBoolean("week_saturday", it).apply() }) } } }
+        item { GlassCard {
+            Text("إشعارات التطبيق", color = Color.White, fontWeight = FontWeight.SemiBold)
+            Text("تحكم في صلاحيات التنبيهات من إعدادات Android.", color = Muted, fontSize = 11.sp)
+            TextButton(onClick = { context.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)) }) { Text("إدارة الإشعارات", color = Gold) }
+        } }
         item { EmptyState("بياناتك محفوظة محلياً على جهازك. لا يحتاج التطبيق إلى حساب أو خادم.") }
     }
 }
