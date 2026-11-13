@@ -188,6 +188,7 @@ private fun DayflowApp(context: Context) {
                         store.write(key, list)
                         if (section == Section.REMINDERS) {
                             val reminder = list.firstOrNull { it.id == savedId }
+                            if (reminder != null) ReminderScheduler.cancel(context, reminder.id.toInt())
                             if (reminder != null && !scheduleReminder(context, reminder.id, reminder.title, reminder.detail)) {
                                 Toast.makeText(context, "اكتب الموعد أولاً بهذا الشكل: 2026-11-13 18:30", Toast.LENGTH_LONG).show()
                             }
