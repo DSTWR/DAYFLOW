@@ -92,7 +92,10 @@ private fun DayflowApp(context: Context) {
     val tasks = remember { mutableStateListOf<Entry>().apply { addAll(store.read("tasks")) } }
     val notes = remember { mutableStateListOf<Entry>().apply { addAll(store.read("notes")) } }
     val reminders = remember { mutableStateListOf<Entry>().apply { addAll(store.read("reminders")) } }
-    val habits = remember { mutableStateListOf<Entry>().apply { addAll(store.read("habits")) } }
+    val habits = remember { mutableStateListOf<Entry>().apply {
+        val today = java.time.LocalDate.now().toString()
+        addAll(store.read("habits").map { it.copy(done = it.detail == today) })
+    } }
     val goals = remember { mutableStateListOf<Entry>().apply { addAll(store.read("goals")) } }
     var section by remember { mutableStateOf(Section.HOME) }
     var showEditor by remember { mutableStateOf(false) }
@@ -122,7 +125,7 @@ private fun DayflowApp(context: Context) {
                     Section.TASKS -> EntryScreen("مهامك", "أنجز ما يهمك، خطوة بخطوة", tasks, "لا توجد مهام بعد", onDelete = { entry -> tasks.remove(entry); store.write("tasks", tasks) }, onToggle = { entry -> val i = tasks.indexOfFirst { it.id == entry.id }; if (i >= 0) { tasks[i] = tasks[i].copy(done = !tasks[i].done); store.write("tasks", tasks) } }) { selectedEntry = it; draftTitle = it.title; draftDetail = it.detail; showEditor = true }
                     Section.NOTES -> EntryScreen("مساحة أفكارك", "دوّن أفكارك وارجع إليها متى شئت", notes, "دفتر ملاحظاتك فارغ", onDelete = { entry -> notes.remove(entry); store.write("notes", notes) }) { selectedEntry = it; draftTitle = it.title; draftDetail = it.detail; showEditor = true }
                     Section.REMINDERS -> EntryScreen("تذكيراتك", "احتفظ بالأمور المهمة أمام عينيك", reminders, "لا توجد تذكيرات بعد", onDelete = { entry -> ReminderScheduler.cancel(context, entry.id.toInt()); reminders.remove(entry); store.write("reminders", reminders) }) { selectedEntry = it; draftTitle = it.title; draftDetail = it.detail; showEditor = true }
-                    Section.HABITS -> HabitScreen(habits, onAdd = { title -> habits.add(0, Entry(System.currentTimeMillis(), title)); store.write("habits", habits) }, onToggle = { entry -> val i = habits.indexOfFirst { it.id == entry.id }; if (i >= 0) { habits[i] = habits[i].copy(done = !habits[i].done); store.write("habits", habits) } }, onDelete = { entry -> habits.remove(entry); store.write("habits", habits) })
+                    Section.HABITS -> HabitScreen(habits, onAdd = { title -> habits.add(0, Entry(System.currentTimeMillis(), title)); store.write("habits", habits) }, onToggle = { entry -> val i = habits.indexOfFirst { it.id == entry.id }; if (i >= 0) { habits[i] = if (habits[i].done) habits[i].copy(done = false, detail = "") else habits[i].copy(done = true, detail = java.time.LocalDate.now().toString()); store.write("habits", habits) } }, onDelete = { entry -> habits.remove(entry); store.write("habits", habits) })
                 }
                 Spacer(Modifier.weight(1f))
                 Row(Modifier.fillMaxWidth().background(Color(0xF0120E20)).horizontalScroll(rememberScrollState()).padding(horizontal = 6.dp, vertical = 5.dp), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
