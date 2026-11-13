@@ -63,7 +63,7 @@ private enum class Section(val title: String, val symbol: String) {
     STATS("إحصائيات", "▥"), SETTINGS("الإعدادات", "⚙")
 }
 
-private data class Entry(val id: Long, val title: String, val detail: String = "", val done: Boolean = false)
+private data class Entry(val id: Long, val title: String, val detail: String = "", val done: Boolean = false, val priority: Int = 1)
 
 private class LocalStore(context: Context) {
     private val prefs = context.getSharedPreferences("dayflow_local", Context.MODE_PRIVATE)
@@ -72,14 +72,14 @@ private class LocalStore(context: Context) {
         val array = try { JSONArray(prefs.getString(key, "[]")) } catch (_: Exception) { JSONArray() }
         for (i in 0 until array.length()) {
             val item = array.optJSONObject(i) ?: continue
-            result.add(Entry(item.optLong("id"), item.optString("title"), item.optString("detail"), item.optBoolean("done")))
+            result.add(Entry(item.optLong("id"), item.optString("title"), item.optString("detail"), item.optBoolean("done"), item.optInt("priority", 1)))
         }
         return result
     }
     fun write(key: String, entries: List<Entry>) {
         val array = JSONArray()
         entries.forEach { entry ->
-            array.put(JSONObject().put("id", entry.id).put("title", entry.title).put("detail", entry.detail).put("done", entry.done))
+            array.put(JSONObject().put("id", entry.id).put("title", entry.title).put("detail", entry.detail).put("done", entry.done).put("priority", entry.priority))
         }
         prefs.edit().putString(key, array.toString()).apply()
     }
@@ -97,6 +97,7 @@ private fun DayflowApp(context: Context) {
     var showEditor by remember { mutableStateOf(false) }
     var draftTitle by remember { mutableStateOf("") }
     var draftDetail by remember { mutableStateOf("") }
+    var draftPriority by remember { mutableIntStateOf(1) }
     var selectedEntry by remember { mutableStateOf<Entry?>(null) }
 
     MaterialTheme(colorScheme = darkColorScheme(primary = Violet, secondary = Gold, background = Night, surface = Panel)) {
@@ -114,7 +115,7 @@ private fun DayflowApp(context: Context) {
                     Section.HOME -> HomeScreen(tasks, notes, reminders) { section = it }
                     Section.CALENDAR -> CalendarScreen(tasks, context)
                     Section.FOCUS -> FocusScreen()
-                    Section.GOALS -> EntryScreen("أهدافك الكبيرة", "حوّل طموحاتك إلى خطوات واضحة", goals, "أضف هدفك الأول", onDelete = { entry -> goals.remove(entry); store.write("goals", goals) }) { selectedEntry = it; draftTitle = it.title; draftDetail = it.detail; showEditor = true }
+                    Section.GOALS -> EntryScreen("أهدافك الكبيرة", "حوّل طموحاتك إلى خطوات واضحة", goals, "أضف هدفك الأول", onDelete = { entry -> goals.remove(entry); store.write("goals", goals) }) { selectedEntry = it; draftTitle = it.title; draftDetail = it.detail; draftPriority = it.priority; showEditor = true }
                     Section.STATS -> StatsScreen(tasks, habits, notes, reminders, goals)
                     Section.SETTINGS -> SettingsScreen(context)
                     Section.TASKS -> EntryScreen("مهامك", "أنجز ما يهمك، خطوة بخطوة", tasks, "لا توجد مهام بعد", onDelete = { entry -> tasks.remove(entry); store.write("tasks", tasks) }, onToggle = { entry -> val i = tasks.indexOfFirst { it.id == entry.id }; if (i >= 0) { tasks[i] = tasks[i].copy(done = !tasks[i].done); store.write("tasks", tasks) } }) { selectedEntry = it; draftTitle = it.title; draftDetail = it.detail; showEditor = true }
@@ -134,7 +135,7 @@ private fun DayflowApp(context: Context) {
             }
             if (section == Section.TASKS || section == Section.NOTES || section == Section.REMINDERS || section == Section.GOALS) {
                 FloatingActionButton(
-                    onClick = { selectedEntry = null; draftTitle = ""; draftDetail = ""; showEditor = true },
+                    onClick = { selectedEntry = null; draftTitle = ""; draftDetail = ""; draftPriority = 1; showEditor = true },
                     modifier = Modifier.align(Alignment.BottomEnd).padding(bottom = 88.dp, end = 22.dp),
                     containerColor = Violet, contentColor = Night
                 ) { Text("+", fontSize = 28.sp) }
@@ -151,7 +152,15 @@ private fun DayflowApp(context: Context) {
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     EditorField(draftTitle, { draftTitle = it }, "العنوان")
-                    EditorField(draftDetail, { draftDetail = it }, if (section == Section.REMINDERS) "موعد: YYYY-MM-DD HH:mm ثم وصف التذكير" else "التفاصيل (اختياري)")
+                    EditorField(draftDetail, { draftDetail = it }, when (section) { Section.REMINDERS -> "موعد: YYYY-MM-DD HH:mm ثم وصف التذكير"; Section.TASKS -> "تاريخ اختياري: YYYY-MM-DD ثم تفاصيل المهمة"; else -> "التفاصيل (اختياري)" })
+                    if (section == Section.TASKS) {
+                        Text("أولوية المهمة", color = Muted, fontSize = 12.sp)
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            listOf(1 to "عادية", 2 to "مهمة", 3 to "عاجلة").forEach { (level, label) ->
+                                FilterChip(selected = draftPriority == level, onClick = { draftPriority = level }, label = { Text(label) })
+                            }
+                        }
+                    }
                 }
             },
             confirmButton = {
@@ -159,10 +168,10 @@ private fun DayflowApp(context: Context) {
                     val title = draftTitle.trim()
                     if (title.isNotEmpty()) {
                         val list = when (section) { Section.TASKS -> tasks; Section.NOTES -> notes; Section.GOALS -> goals; else -> reminders }
-                        if (selectedEntry == null) list.add(0, Entry(System.currentTimeMillis(), title, draftDetail.trim()))
+                        if (selectedEntry == null) list.add(0, Entry(System.currentTimeMillis(), title, draftDetail.trim(), priority = if (section == Section.TASKS) draftPriority else 1))
                         else {
                             val index = list.indexOfFirst { it.id == selectedEntry!!.id }
-                            if (index >= 0) list[index] = selectedEntry!!.copy(title = title, detail = draftDetail.trim())
+                            if (index >= 0) list[index] = selectedEntry!!.copy(title = title, detail = draftDetail.trim(), priority = if (section == Section.TASKS) draftPriority else selectedEntry!!.priority)
                         }
                         val key = when (section) { Section.TASKS -> "tasks"; Section.NOTES -> "notes"; Section.GOALS -> "goals"; else -> "reminders" }
                         store.write(key, list)
@@ -236,6 +245,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.EntryScreen(title: St
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f).clickable { edit(entry) }) {
                         Text(entry.title, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                        if (entry.priority > 1) Text(if (entry.priority == 3) "أولوية عاجلة" else "أولوية مهمة", color = if (entry.priority == 3) Color(0xFFFF9A9A) else Gold, fontSize = 10.sp)
                         if (entry.detail.isNotBlank()) Text(entry.detail, color = Muted, fontSize = 12.sp)
                     }
                     if (onToggle != null) Text(if (entry.done) "✓" else "○", color = if (entry.done) Gold else Violet, fontSize = 22.sp, modifier = Modifier.clickable { onToggle(entry) }.padding(8.dp))
