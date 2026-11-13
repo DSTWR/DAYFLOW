@@ -4,6 +4,7 @@ import android.content.Context
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
+import android.widget.Toast
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.dstwr.dayflow.core.notifications.ReminderChannels
@@ -168,16 +169,23 @@ private fun DayflowApp(context: Context) {
                     val title = draftTitle.trim()
                     if (title.isNotEmpty()) {
                         val list = when (section) { Section.TASKS -> tasks; Section.NOTES -> notes; Section.GOALS -> goals; else -> reminders }
-                        if (selectedEntry == null) list.add(0, Entry(System.currentTimeMillis(), title, draftDetail.trim(), priority = if (section == Section.TASKS) draftPriority else 1))
-                        else {
-                            val index = list.indexOfFirst { it.id == selectedEntry!!.id }
-                            if (index >= 0) list[index] = selectedEntry!!.copy(title = title, detail = draftDetail.trim(), priority = if (section == Section.TASKS) draftPriority else selectedEntry!!.priority)
+                        val savedId = if (selectedEntry == null) {
+                            val newId = System.currentTimeMillis()
+                            list.add(0, Entry(newId, title, draftDetail.trim(), priority = if (section == Section.TASKS) draftPriority else 1))
+                            newId
+                        } else {
+                            val existing = selectedEntry!!
+                            val index = list.indexOfFirst { it.id == existing.id }
+                            if (index >= 0) list[index] = existing.copy(title = title, detail = draftDetail.trim(), priority = if (section == Section.TASKS) draftPriority else existing.priority)
+                            existing.id
                         }
                         val key = when (section) { Section.TASKS -> "tasks"; Section.NOTES -> "notes"; Section.GOALS -> "goals"; else -> "reminders" }
                         store.write(key, list)
                         if (section == Section.REMINDERS) {
-                            val reminder = list.firstOrNull { it.title == title && (selectedEntry == null || it.id == selectedEntry!!.id) }
-                            reminder?.let { scheduleReminder(context, it.id, it.title, it.detail) }
+                            val reminder = list.firstOrNull { it.id == savedId }
+                            if (reminder != null && !scheduleReminder(context, reminder.id, reminder.title, reminder.detail)) {
+                                Toast.makeText(context, "اكتب الموعد أولاً بهذا الشكل: 2026-11-13 18:30", Toast.LENGTH_LONG).show()
+                            }
                         }
                     }
                     showEditor = false
@@ -418,15 +426,14 @@ private fun androidx.compose.foundation.layout.ColumnScope.SettingsScreen(contex
     }
 }
 
-private fun scheduleReminder(context: Context, id: Long, title: String, details: String) {
+private fun scheduleReminder(context: Context, id: Long, title: String, details: String): Boolean {
     val dateText = details.take(16)
     val trigger = try {
         java.time.LocalDateTime.parse(dateText, java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
             .atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
-    } catch (_: Exception) { return }
-    if (trigger > System.currentTimeMillis()) {
-        ReminderScheduler.schedule(context, id.toInt(), title, details.drop(16).trim().ifBlank { "حان موعد تذكيرك" }, trigger)
-    }
+    } catch (_: Exception) { return false }
+    if (trigger <= System.currentTimeMillis()) return false
+    return ReminderScheduler.schedule(context, id.toInt(), title, details.drop(16).trim().ifBlank { "حان موعد تذكيرك" }, trigger)
 }
 
 @Composable
