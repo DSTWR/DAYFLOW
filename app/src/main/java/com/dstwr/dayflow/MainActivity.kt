@@ -105,7 +105,7 @@ private fun DayflowApp(context: Context) {
                 }
                 when (section) {
                     Section.HOME -> HomeScreen(tasks, notes, reminders) { section = it }
-                    Section.CALENDAR -> CalendarScreen(tasks)
+                    Section.CALENDAR -> CalendarScreen(tasks, context)
                     Section.FOCUS -> FocusScreen()
                     Section.GOALS -> EntryScreen("أهدافك الكبيرة", "حوّل طموحاتك إلى خطوات واضحة", goals, "أضف هدفك الأول", onDelete = { entry -> goals.remove(entry); store.write("goals", goals) }) { selectedEntry = it; draftTitle = it.title; draftDetail = it.detail; showEditor = true }
                     Section.STATS -> StatsScreen(tasks, habits, notes, reminders, goals)
@@ -309,19 +309,27 @@ private fun GlassCard(modifier: Modifier = Modifier, content: @Composable Column
 }
 
 @Composable
-private fun androidx.compose.foundation.layout.ColumnScope.CalendarScreen(tasks: List<Entry>) {
+private fun androidx.compose.foundation.layout.ColumnScope.CalendarScreen(tasks: List<Entry>, context: Context) {
     val today = remember { java.time.LocalDate.now() }
     var selected by remember { mutableStateOf(today) }
-    val first = today.withDayOfMonth(1)
+    var displayedMonth by remember { mutableStateOf(today.withDayOfMonth(1)) }
+    val saturdayStart = remember { context.getSharedPreferences("dayflow_settings", Context.MODE_PRIVATE).getBoolean("week_saturday", true) }
+    val first = displayedMonth
     val days = first.lengthOfMonth()
     Column(Modifier.fillMaxWidth().weight(1f).padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         GlassCard {
-            Text(today.month.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale("ar")), color = Gold, fontSize = 21.sp, fontWeight = FontWeight.Bold)
-            Text(today.year.toString(), color = Muted)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                listOf("س", "ح", "ن", "ث", "ر", "خ", "ج").forEach { Text(it, color = Muted, modifier = Modifier.weight(1f), textAlign = TextAlign.Center) }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("‹", color = Gold, fontSize = 26.sp, modifier = Modifier.clickable { displayedMonth = displayedMonth.minusMonths(1); selected = displayedMonth }.padding(horizontal = 10.dp))
+                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(displayedMonth.month.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale("ar")), color = Gold, fontSize = 21.sp, fontWeight = FontWeight.Bold)
+                    Text(displayedMonth.year.toString(), color = Muted)
+                }
+                Text("›", color = Gold, fontSize = 26.sp, modifier = Modifier.clickable { displayedMonth = displayedMonth.plusMonths(1); selected = displayedMonth }.padding(horizontal = 10.dp))
             }
-            val offset = first.dayOfWeek.value % 7
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                (if (saturdayStart) listOf("س", "ح", "ن", "ث", "ر", "خ", "ج") else listOf("ح", "ن", "ث", "ر", "خ", "ج", "س")).forEach { Text(it, color = Muted, modifier = Modifier.weight(1f), textAlign = TextAlign.Center) }
+            }
+            val offset = if (saturdayStart) (first.dayOfWeek.value + 1) % 7 else first.dayOfWeek.value % 7
             for (week in 0..((offset + days - 1) / 7)) {
                 Row(Modifier.fillMaxWidth()) {
                     for (day in 0..6) {
