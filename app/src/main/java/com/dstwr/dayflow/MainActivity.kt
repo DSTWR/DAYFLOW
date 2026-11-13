@@ -235,7 +235,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.HomeScreen(tasks: Lis
         }
         item { SectionHeader("أقرب مهامك", "قائمة سريعة") }
         if (tasks.isEmpty()) item { EmptyState("ابدأ بإضافة أول مهمة إلى يومك") }
-        items(tasks.take(3), key = { it.id }) { entry ->
+        items(tasks.sortedWith(compareBy<Entry> { it.done }.thenByDescending { it.priority }.thenByDescending { it.id }).take(3), key = { it.id }) { entry ->
             GlassCard {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(if (entry.done) "✓" else "○", color = if (entry.done) Gold else Violet, fontSize = 22.sp)
@@ -251,10 +251,11 @@ private fun androidx.compose.foundation.layout.ColumnScope.HomeScreen(tasks: Lis
 
 @Composable
 private fun androidx.compose.foundation.layout.ColumnScope.EntryScreen(title: String, subtitle: String, entries: MutableList<Entry>, empty: String, onDelete: (Entry) -> Unit, onToggle: ((Entry) -> Unit)? = null, edit: (Entry) -> Unit) {
+    val orderedEntries = if (title == "مهامك") entries.sortedWith(compareBy<Entry> { it.done }.thenByDescending { it.priority }.thenByDescending { it.id }) else entries.toList()
     LazyColumn(Modifier.fillMaxWidth().weight(1f), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { Text(subtitle, color = Muted, fontSize = 13.sp) }
         if (entries.isEmpty()) item { EmptyState(empty) }
-        items(entries.toList(), key = { it.id }) { entry ->
+        items(orderedEntries, key = { it.id }) { entry ->
             GlassCard {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f).clickable { edit(entry) }) {
