@@ -1,6 +1,13 @@
 package com.dstwr.dayflow
 
 import android.content.Context
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import com.dstwr.dayflow.core.notifications.ReminderChannels
+import com.dstwr.dayflow.core.notifications.ReminderScheduler
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -36,6 +43,10 @@ private val Muted = Color(0xFFBDB5CF)
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        ReminderChannels.create(this)
+        if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 301)
+        }
         setContent { DayflowApp(this) }
     }
 }
@@ -96,12 +107,12 @@ private fun DayflowApp(context: Context) {
                     Section.HOME -> HomeScreen(tasks, notes, reminders) { section = it }
                     Section.CALENDAR -> CalendarScreen(tasks)
                     Section.FOCUS -> FocusScreen()
-                    Section.GOALS -> EntryScreen("أهدافك الكبيرة", "حوّل طموحاتك إلى خطوات واضحة", goals, "أضف هدفك الأول", onDelete = { store.write("goals", goals) }) { selectedEntry = it; draftTitle = it.title; draftDetail = it.detail; showEditor = true }
+                    Section.GOALS -> EntryScreen("أهدافك الكبيرة", "حوّل طموحاتك إلى خطوات واضحة", goals, "أضف هدفك الأول", onDelete = { entry -> goals.remove(entry); store.write("goals", goals) }) { selectedEntry = it; draftTitle = it.title; draftDetail = it.detail; showEditor = true }
                     Section.STATS -> StatsScreen(tasks, habits, notes, reminders, goals)
                     Section.SETTINGS -> SettingsScreen(context)
-                    Section.TASKS -> EntryScreen("مهامك", "أنجز ما يهمك، خطوة بخطوة", tasks, "لا توجد مهام بعد", onDelete = { store.write("tasks", tasks) }, onToggle = { entry -> val i = tasks.indexOfFirst { it.id == entry.id }; if (i >= 0) { tasks[i] = tasks[i].copy(done = !tasks[i].done); store.write("tasks", tasks) } }) { selectedEntry = it; draftTitle = it.title; draftDetail = it.detail; showEditor = true }
-                    Section.NOTES -> EntryScreen("مساحة أفكارك", "دوّن أفكارك وارجع إليها متى شئت", notes, "دفتر ملاحظاتك فارغ", onDelete = { store.write("notes", notes) }) { selectedEntry = it; draftTitle = it.title; draftDetail = it.detail; showEditor = true }
-                    Section.REMINDERS -> EntryScreen("تذكيراتك", "احتفظ بالأمور المهمة أمام عينيك", reminders, "لا توجد تذكيرات بعد", onDelete = { store.write("reminders", reminders) }) { selectedEntry = it; draftTitle = it.title; draftDetail = it.detail; showEditor = true }
+                    Section.TASKS -> EntryScreen("مهامك", "أنجز ما يهمك، خطوة بخطوة", tasks, "لا توجد مهام بعد", onDelete = { entry -> tasks.remove(entry); store.write("tasks", tasks) }, onToggle = { entry -> val i = tasks.indexOfFirst { it.id == entry.id }; if (i >= 0) { tasks[i] = tasks[i].copy(done = !tasks[i].done); store.write("tasks", tasks) } }) { selectedEntry = it; draftTitle = it.title; draftDetail = it.detail; showEditor = true }
+                    Section.NOTES -> EntryScreen("مساحة أفكارك", "دوّن أفكارك وارجع إليها متى شئت", notes, "دفتر ملاحظاتك فارغ", onDelete = { entry -> notes.remove(entry); store.write("notes", notes) }) { selectedEntry = it; draftTitle = it.title; draftDetail = it.detail; showEditor = true }
+                    Section.REMINDERS -> EntryScreen("تذكيراتك", "احتفظ بالأمور المهمة أمام عينيك", reminders, "لا توجد تذكيرات بعد", onDelete = { entry -> ReminderScheduler.cancel(context, entry.id.toInt()); reminders.remove(entry); store.write("reminders", reminders) }) { selectedEntry = it; draftTitle = it.title; draftDetail = it.detail; showEditor = true }
                     Section.HABITS -> HabitScreen(habits, onAdd = { title -> habits.add(0, Entry(System.currentTimeMillis(), title)); store.write("habits", habits) }, onToggle = { entry -> val i = habits.indexOfFirst { it.id == entry.id }; if (i >= 0) { habits[i] = habits[i].copy(done = !habits[i].done); store.write("habits", habits) } }, onDelete = { entry -> habits.remove(entry); store.write("habits", habits) })
                 }
                 Spacer(Modifier.weight(1f))
@@ -133,7 +144,7 @@ private fun DayflowApp(context: Context) {
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     EditorField(draftTitle, { draftTitle = it }, "العنوان")
-                    EditorField(draftDetail, { draftDetail = it }, "التفاصيل (اختياري)")
+                    EditorField(draftDetail, { draftDetail = it }, if (section == Section.REMINDERS) "موعد: YYYY-MM-DD HH:mm ثم وصف التذكير" else "التفاصيل (اختياري)")
                 }
             },
             confirmButton = {
@@ -148,6 +159,10 @@ private fun DayflowApp(context: Context) {
                         }
                         val key = when (section) { Section.TASKS -> "tasks"; Section.NOTES -> "notes"; Section.GOALS -> "goals"; else -> "reminders" }
                         store.write(key, list)
+                        if (section == Section.REMINDERS) {
+                            val reminder = list.firstOrNull { it.title == title && (selectedEntry == null || it.id == selectedEntry!!.id) }
+                            reminder?.let { scheduleReminder(context, it.id, it.title, it.detail) }
+                        }
                     }
                     showEditor = false
                 }) { Text("حفظ", color = Gold) }
@@ -204,7 +219,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.HomeScreen(tasks: Lis
 }
 
 @Composable
-private fun androidx.compose.foundation.layout.ColumnScope.EntryScreen(title: String, subtitle: String, entries: MutableList<Entry>, empty: String, onDelete: () -> Unit, onToggle: ((Entry) -> Unit)? = null, edit: (Entry) -> Unit) {
+private fun androidx.compose.foundation.layout.ColumnScope.EntryScreen(title: String, subtitle: String, entries: MutableList<Entry>, empty: String, onDelete: (Entry) -> Unit, onToggle: ((Entry) -> Unit)? = null, edit: (Entry) -> Unit) {
     LazyColumn(Modifier.fillMaxWidth().weight(1f), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { Text(subtitle, color = Muted, fontSize = 13.sp) }
         if (entries.isEmpty()) item { EmptyState(empty) }
@@ -217,7 +232,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.EntryScreen(title: St
                     }
                     if (onToggle != null) Text(if (entry.done) "✓" else "○", color = if (entry.done) Gold else Violet, fontSize = 22.sp, modifier = Modifier.clickable { onToggle(entry) }.padding(8.dp))
                     Text("تحرير", color = Gold, fontSize = 12.sp, modifier = Modifier.clickable { edit(entry) }.padding(8.dp))
-                    Text("×", color = Color(0xFFFF8F9B), fontSize = 20.sp, modifier = Modifier.clickable { entries.remove(entry); onDelete() }.padding(8.dp))
+                    Text("×", color = Color(0xFFFF8F9B), fontSize = 20.sp, modifier = Modifier.clickable { onDelete(entry) }.padding(8.dp))
                 }
             }
         }
@@ -374,5 +389,16 @@ private fun androidx.compose.foundation.layout.ColumnScope.SettingsScreen(contex
         item { GlassCard { Row(verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text("الاهتزاز", color = Color.White); Text("استجابة لمسية عند التفاعل", color = Muted, fontSize = 11.sp) }; Switch(haptics, { haptics = it; prefs.edit().putBoolean("haptics", it).apply() }) } } }
         item { GlassCard { Row(verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text("بداية الأسبوع", color = Color.White); Text("السبت بدلاً من الأحد", color = Muted, fontSize = 11.sp) }; Switch(weekStart, { weekStart = it; prefs.edit().putBoolean("week_saturday", it).apply() }) } } }
         item { EmptyState("بياناتك محفوظة محلياً على جهازك. لا يحتاج التطبيق إلى حساب أو خادم.") }
+    }
+}
+
+private fun scheduleReminder(context: Context, id: Long, title: String, details: String) {
+    val dateText = details.take(16)
+    val trigger = try {
+        java.time.LocalDateTime.parse(dateText, java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
+            .atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+    } catch (_: Exception) { return }
+    if (trigger > System.currentTimeMillis()) {
+        ReminderScheduler.schedule(context, id.toInt(), title, details.drop(16).trim().ifBlank { "حان موعد تذكيرك" }, trigger)
     }
 }
