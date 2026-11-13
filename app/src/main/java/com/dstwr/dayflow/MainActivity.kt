@@ -170,7 +170,8 @@ private fun DayflowApp(context: Context) {
                             val calendar = Calendar.getInstance()
                             DatePickerDialog(context, { _, year, month, day ->
                                 TimePickerDialog(context, { _, hour, minute ->
-                                    val message = draftDetail.drop(16).trim()
+                                    val hasDatePrefix = draftDetail.length >= 16 && draftDetail[4] == '-' && draftDetail[7] == '-' && draftDetail[10] == ' ' && draftDetail[13] == ':'
+                                    val message = if (hasDatePrefix) draftDetail.drop(16).trim() else draftDetail.trim()
                                     draftDetail = String.format(Locale.US, "%04d-%02d-%02d %02d:%02d", year, month + 1, day, hour, minute) + if (message.isBlank()) "" else " $message"
                                 }, calendar.get(Calendar.HOUR_OF_DAY), calendar.get(Calendar.MINUTE), true).show()
                             }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)).show()
